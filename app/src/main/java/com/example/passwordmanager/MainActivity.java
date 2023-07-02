@@ -1,6 +1,8 @@
 package com.example.passwordmanager;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import android.os.Bundle;
 import android.util.Log;
@@ -17,129 +19,86 @@ import android.content.Intent;
 import android.view.View;
 import android.widget.Toast;
 
+import com.firebase.ui.firestore.FirestoreRecyclerOptions;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.Query;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
-    TextView userName;
-
-    Button logout;
-    private EditText websiteEditText;
-    private EditText passwordEditText;
-    private Button submitPasswordButton;
-    private ListView entriesListView;
-    private List<Entry> entries;
     private EntryAdapter entryAdapter;
+    TextView userName;
+    Button logout;
+
     private FirebaseFirestore db;
     private CollectionReference entriesCollection;
+    private CollectionReference entryCollection;
 
-    ;
-    private Button addBtn;
-
-
-
-
-
-
-
+    FloatingActionButton addBtn;
+    private RecyclerView recyclerView;
     private FirebaseAuth auth;
-
     private String userId;
-
-
-
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main2);
+        // logout and display system
         logout = findViewById(R.id.logout);
         userName = findViewById(R.id.userName);
         String displayemail = getIntent().getStringExtra("name");
-        String displayName=getCharactersBeforeAt(displayemail);
-        websiteEditText = findViewById(R.id.website);
-        passwordEditText = findViewById(R.id.password);
-        addBtn = findViewById(R.id.addBtn);
-        userName = findViewById(R.id.userName);
-        entriesListView = findViewById(R.id.listview);
-        entries = new ArrayList<>();
-        entryAdapter = new EntryAdapter(this, entries);
-        entriesListView.setAdapter(entryAdapter);
-        auth = FirebaseAuth.getInstance();
+        String displayName = getCharactersBeforeAt(displayemail);
+        addBtn = findViewById(R.id.add_item_btn);
+        recyclerView=findViewById(R.id.recyler_view);
 
+        // firebase intitation
+        auth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
         entriesCollection = db.collection("entries");
-
         FirebaseUser currentUser = auth.getCurrentUser();
+        // to display name of current user
         if (currentUser != null) {
             userId = currentUser.getUid();
             String name = currentUser.getDisplayName();
             userName.setText(name);
         }
-
         userName.setText(displayName);
+        setupRecyclerView();
+
+
+// logout button logic
         logout.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                 {
+                {
 
-                        startActivity(new Intent(MainActivity.this, LoginActivity.class));
-                    }
-                }});
-        addBtn.setOnClickListener(view -> {
-            String website = websiteEditText.getText().toString().trim();
-            String password = passwordEditText.getText().toString().trim();
-
-            if (!website.isEmpty() && !password.isEmpty()) {
-                Entry newEntry = new Entry(website, password, userId);
-
-                entriesCollection.add(newEntry)
-                        .addOnSuccessListener(documentReference -> {
-                            newEntry.setId(documentReference.getId());
-                            entries.add(newEntry);
-                            entryAdapter.notifyDataSetChanged();
-
-                            websiteEditText.setText("");
-                            passwordEditText.setText("");
-                        })
-                        .addOnFailureListener(e ->
-                                Toast.makeText(MainActivity.this, "Failed to add entry.", Toast.LENGTH_SHORT).show());
-            } else {
-                Toast.makeText(MainActivity.this, "Please enter both website and password", Toast.LENGTH_SHORT).show();
+                    startActivity(new Intent(MainActivity.this, LoginActivity.class));
+                }
             }
         });
+////////////////////end logout button logic ////////////////////////////////
 
-        entriesCollection.whereEqualTo("userId", userId)
-                .addSnapshotListener((value, error) -> {
-                    if (error != null) {
-                        Log.e("MainActivity", "Error getting entries: ", error);
-                        return;
-                    }
+        //// recycler view display logic //////////
 
-                    entries.clear();
-                    if (value != null) {
-                        for (DocumentSnapshot doc : value) {
-                            Entry entry = doc.toObject(Entry.class);
-                            entry.setId(doc.getId());
-                            entries.add(entry);
-                        }
-                    }
+        addBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                {
 
-                    entryAdapter.notifyDataSetChanged();
-                });
+                    startActivity(new Intent(MainActivity.this, ItemDetails.class));
+                }
+            }
+        });
+    }
 
 
-
-
-
-}public  String getCharactersBeforeAt(String email) {
+public  String getCharactersBeforeAt(String email) {
         int atIndex = email.indexOf("@");
 
         if (atIndex != -1) {
@@ -148,4 +107,34 @@ public class MainActivity extends AppCompatActivity {
 
         return null;
     }
+    void setupRecyclerView(){
+        Query query  = Utility.getCollectionReferenceForNotes().orderBy("website",Query.Direction.DESCENDING);
+        FirestoreRecyclerOptions<Entry> options = new FirestoreRecyclerOptions.Builder<Entry>()
+                .setQuery(query,Entry.class).build();
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        entryAdapter = new EntryAdapter(options,this);
+        recyclerView.setAdapter(entryAdapter);
+    }
+
+
+///       end recycler view display logic /////////
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        entryAdapter.startListening();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        entryAdapter.stopListening();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        entryAdapter.notifyDataSetChanged();
+    }
+
 }

@@ -1,6 +1,15 @@
 package com.example.passwordmanager;
 
 public class Entry {
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    private String username;
     private String id;
     private String website;
 
@@ -43,7 +52,7 @@ public class Entry {
         this.website = website;
     }
 
-    public Entry(String website, String password, String userId) {
+    public Entry(String website,String username, String password, String userId) {
         this.website = website;
         this.password = password;
         this.userId = userId;
